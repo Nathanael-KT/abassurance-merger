@@ -34,7 +34,19 @@ jobs:
       - name: Run tests with coverage
         run: pytest --cov=src --cov-report=xml --cov-report=term-missing
 
+      - name: Check SonarCloud token
+        id: sonar-token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: SonarCloud Scan
+        if: steps.sonar-token.outputs.configured == 'true'
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
