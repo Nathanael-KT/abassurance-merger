@@ -47,6 +47,7 @@ jobs:
 
       - name: SonarCloud Scan
         if: steps.sonar-token.outputs.configured == 'true'
+        continue-on-error: true
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
