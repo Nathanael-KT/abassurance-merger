@@ -15,6 +15,8 @@ faker
 flake8
 pyarrow  # requis par le fallback pandas.to_parquet() dans src/spark/spark_job.py
 
+mlflow  # tracabilite des entrainements (src/ml/train_model.py)
+
 # Optionnel : uniquement nécessaire si un vrai broker Kafka / cluster Spark est disponible.
 # kafka-python
 # pyspark

@@ -10,3 +10,4 @@ src/ml/artifacts/
 venv/
 *.egg-info/
 .env
+src/ml/mlruns/

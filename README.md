@@ -199,3 +199,32 @@ Règles associées :
 | `v1.0.0` | EPIC 1/2/3/5 livrés : unification des données, ingestion Kafka, ETL/Spark, modèle IA de risque client + API |
 | `v1.0.1` | Correctif : dépendance `pyarrow` manquante pour l'écriture Parquet |
 | `v1.0.2` | Correctif : sémantique peek/commit sur le bus Kafka (perte de messages en cas d'échec) |
+
+---
+
+## Dimension IA : données, fuite de données (data leakage) et suivi des entraînements
+
+### Le modèle est branché sur le data lake
+```bash
+python -m src.spark.generate_lake   # génère clients/contrats/sinistres/paiements en Parquet
+python -m src.ml.train_model        # entraîne sur data/hdfs_sim/*.parquet (repli synthétique sinon)
+```
+`src/ml/lake_dataset.py` construit une ligne par client avec une **date d'observation** :
+les variables ne regardent que le passé (12 mois avant), la cible `risque_client` est calculée
+sur le futur (12 mois après : sinistre important ou au moins 3 retards de paiement).
+
+### Bonnes pratiques IA appliquées
+| Risque | Parade dans le code | Test |
+|---|---|---|
+| **Data leakage** (ex. `date_fin` du contrat, statut final : inconnus au moment de prédire) | `LEAKY_COLUMNS` + `assert_no_leakage()`, coupure temporelle passé/futur | `test_assert_no_leakage_rejects_contract_end_date`, `test_features_ignore_events_after_observation_date` |
+| **Déséquilibre des classes** (~9 % de positifs) | `class_weight="balanced"`, split stratifié, profil `class_balance()` tracé | `test_class_imbalance_is_profiled` |
+| **Features invalides** (nulls, infinis, hors plage) | `validate_features()` bloque l'entraînement | `test_validate_features_detects_problems` |
+| **Dérive du modèle** | PSI (`population_drift`) : < 0,1 stable, > 0,25 dérive | `test_population_drift_detects_shift` |
+| **Traçabilité** | MLflow : paramètres, métriques, source des données (`mlruns/`) | `test_train_uses_data_lake_when_available` |
+
+### Bug propre à l'IA : la fuite de données (documenté et testé)
+Symptôme : un score « trop beau » (AUC > 0,95). `test_bug_ia_leakage_inflates_score` injecte une
+variable qui contient la réponse : l'AUC passe à plus de 0,95 contre environ 0,75 sans fuite, et
+`assert_no_leakage` bloque la variable. **Un score parfait est un signal d'alerte, pas un succès.**
+
+Suivi des entraînements : `mlflow ui --backend-store-uri src/ml/mlruns`.
